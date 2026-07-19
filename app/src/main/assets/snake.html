@@ -114,24 +114,21 @@
   .skin-chip.locked { opacity: 0.45; }
   .skin-title { margin-top: 16px; font-size: 13px; color: #888; }
 
-  /* 底部方向键：左右分屏双拇指 */
-  #dpad {
-    flex: 0 0 auto;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 6px 14px 16px;
-  }
-  .dp-side { display: flex; gap: 12px; }
-  .dp {
-    width: 80px; height: 80px;
-    border-radius: 50%;
+  /* 虚拟摇杆 */
+  #joyBase {
+    position: fixed; width: 120px; height: 120px; border-radius: 50%;
     background: rgba(255,255,255,0.06);
-    border: 1.5px solid rgba(255,255,255,0.16); color: #dfe6f7; font-size: 28px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+    border: 1.5px solid rgba(255,255,255,0.18);
+    z-index: 30; pointer-events: none;
+    margin: -60px 0 0 -60px;
   }
-  .dp:active {
-    background: rgba(78,204,163,0.25);
-    border-color: rgba(78,204,163,0.7);
-    transform: scale(0.92);
+  #joyKnob {
+    position: absolute; left: 50%; top: 50%;
+    width: 52px; height: 52px; border-radius: 50%;
+    margin: -26px 0 0 -26px;
+    background: rgba(78,204,163,0.45);
+    border: 1.5px solid rgba(78,204,163,0.8);
+    box-shadow: 0 0 14px rgba(78,204,163,0.5);
   }
 </style>
 </head>
@@ -148,7 +145,7 @@
     <div class="overlay" id="startScreen">
       <h1>贪吃蛇</h1>
       <div class="sub-title">S N A K E · R U S H</div>
-      <p>滑动或方向键控制，撞墙或咬到自己则失败<br>吃到第2个豆子后出现对手蛇<br>咬它的蛇身可把它变成金豆，被它咬到则失败</p>
+      <p>按住屏幕滑动出现虚拟摇杆，往哪推往哪走<br>撞墙或咬到自己则失败；吃到第2个豆子后出现对手蛇<br>咬它的蛇身可把它变成金豆，被它咬到则失败</p>
       <div class="legend">
         <span><i class="dot" style="background:#e94560"></i>豆子 +1</span>
         <span><i class="dot" style="background:#ffd460"></i>金豆子 +5</span>
@@ -182,16 +179,7 @@
       <button class="btn" id="menuBtn" style="background:#16213e;border:1px solid #4ecca3;box-shadow:none;padding:10px 30px;font-size:16px">返回主界面</button>
     </div>
   </div>
-  <div id="dpad">
-    <div class="dp-side">
-      <button class="dp" data-d="left">◀</button>
-      <button class="dp" data-d="right">▶</button>
-    </div>
-    <div class="dp-side">
-      <button class="dp" data-d="up">▲</button>
-      <button class="dp" data-d="down">▼</button>
-    </div>
-  </div>
+  <div id="joyBase" class="hidden"><div id="joyKnob"></div></div>
 </div>
 
 <script>
@@ -1057,51 +1045,61 @@ window.onerror = function (msg, src, line) {
     }
   }
 
-  // ---------- 触摸滑动控制 ----------
-  var touchX = null, touchY = null;
+  // ---------- 虚拟摇杆 ----------
+  var joyBase = document.getElementById('joyBase');
+  var joyKnob = document.getElementById('joyKnob');
+  var joyId = null, joyX = 0, joyY = 0;
+  var JOY_R = 44, JOY_DEAD = 16;
+
   document.addEventListener('touchstart', function (e) {
-    var t = e.touches[0];
-    touchX = t.clientX; touchY = t.clientY;
+    if (state !== 'playing' || joyId !== null) return;
+    var t = e.changedTouches[0];
+    if (t.target && t.target.tagName === 'BUTTON') return; // 暂停键等按钮不触发摇杆
+    joyId = t.identifier;
+    joyX = t.clientX; joyY = t.clientY;
+    joyBase.style.left = joyX + 'px';
+    joyBase.style.top = joyY + 'px';
+    joyKnob.style.transform = 'translate(0,0)';
+    joyBase.classList.remove('hidden');
+    initAudio();
   }, {passive: false});
 
   document.addEventListener('touchmove', function (e) {
     e.preventDefault(); // 阻止页面滚动/下拉刷新
-    if (touchX === null || state !== 'playing') return;
-    var t = e.touches[0];
-    var dx = t.clientX - touchX, dy = t.clientY - touchY;
-    var TH = 24; // 滑动触发阈值
-    if (Math.abs(dx) < TH && Math.abs(dy) < TH) return;
-    var nd;
-    if (Math.abs(dx) > Math.abs(dy)) nd = {x: dx > 0 ? 1 : -1, y: 0};
-    else nd = {x: 0, y: dy > 0 ? 1 : -1};
-    // 禁止直接反向
-    if (nd.x !== -dir.x || nd.y !== -dir.y) {
-      if (nd.x !== nextDir.x || nd.y !== nextDir.y) sfx.turn();
-      nextDir = nd;
+    if (joyId === null) return;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      if (t.identifier !== joyId) continue;
+      var dx = t.clientX - joyX, dy = t.clientY - joyY;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var cl = Math.min(len, JOY_R);
+      joyKnob.style.transform = 'translate(' + (dx / len * cl).toFixed(1) + 'px,' + (dy / len * cl).toFixed(1) + 'px)';
+      if (len < JOY_DEAD) return;
+      var nd;
+      if (Math.abs(dx) > Math.abs(dy)) nd = {x: dx > 0 ? 1 : -1, y: 0};
+      else nd = {x: 0, y: dy > 0 ? 1 : -1};
+      setDir(nd);
     }
-    touchX = t.clientX; touchY = t.clientY; // 支持连续滑动多次转向
   }, {passive: false});
 
-  document.addEventListener('touchend', function () { touchX = null; }, {passive: false});
+  function joyEnd(e) {
+    if (joyId === null) return;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joyId) {
+        joyId = null;
+        joyBase.classList.add('hidden');
+      }
+    }
+  }
+  document.addEventListener('touchend', joyEnd, {passive: false});
+  document.addEventListener('touchcancel', joyEnd, {passive: false});
 
-  // ---------- 底部方向键 ----------
+  // ---------- 方向设置 ----------
   function setDir(nd) {
     if (state !== 'playing') return;
     if (nd.x === -dir.x && nd.y === -dir.y) return; // 禁止直接反向
     if (nd.x !== nextDir.x || nd.y !== nextDir.y) sfx.turn();
     nextDir = nd;
-  }
-  var DMAP = {up: {x: 0, y: -1}, down: {x: 0, y: 1}, left: {x: -1, y: 0}, right: {x: 1, y: 0}};
-  var dps = document.querySelectorAll('.dp');
-  for (var di = 0; di < dps.length; di++) {
-    (function (btn) {
-      var ndd = DMAP[btn.getAttribute('data-d')];
-      btn.addEventListener('touchstart', function (e) {
-        e.preventDefault(); e.stopPropagation();
-        initAudio(); setDir(ndd);
-      }, {passive: false});
-      btn.addEventListener('mousedown', function () { setDir(ndd); });
-    })(dps[di]);
   }
 
   // 键盘（便于电脑上调试）
