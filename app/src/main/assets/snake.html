@@ -10,7 +10,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     width: 100%; height: 100%; overflow: hidden;
-    background: #1a1a2e;
+    background: radial-gradient(circle at 30% 10%, #2b2350 0%, #171430 45%, #0d0b1e 100%);
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     touch-action: none;
     user-select: none; -webkit-user-select: none;
@@ -18,76 +18,128 @@
   }
   #app { width: 100%; height: 100%; display: flex; flex-direction: column; }
 
-  /* 顶部信息栏 */
+  /* 顶部 HUD 徽章 */
   #topbar {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 16px; color: #eee; flex: 0 0 auto;
+    padding: 12px 14px 8px; color: #eee; flex: 0 0 auto;
   }
-  .score-box { text-align: center; }
-  .score-box .label { font-size: 12px; color: #888; }
-  .score-box .value { font-size: 22px; font-weight: bold; color: #4ecca3; }
-  .score-box .value.hs { color: #ffd460; }
+  .score-box {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px; border-radius: 999px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.3);
+    font-size: 17px;
+  }
+  .score-box .value { font-size: 24px; font-weight: 900; color: #4ecca3; text-shadow: 0 0 12px rgba(78,204,163,0.6); transition: transform 0.12s; }
+  .score-box .value.hs { color: #ffd460; text-shadow: 0 0 12px rgba(255,212,96,0.6); }
+  .score-box .value.pop { transform: scale(1.35); }
   #pauseBtn {
-    width: 44px; height: 44px; border-radius: 12px;
-    background: #16213e; border: 1px solid #333;
-    color: #eee; font-size: 18px; display: flex;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #eee; font-size: 17px; display: flex;
     align-items: center; justify-content: center;
   }
 
   /* 画布区域 */
   #canvasWrap { flex: 1 1 auto; position: relative; padding: 0 8px 8px; }
-  canvas { display: block; border-radius: 10px; background: #16213e; }
+  canvas {
+    display: block; border-radius: 16px; background: #16213e;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.09), 0 0 26px rgba(78,204,163,0.14), 0 10px 30px rgba(0,0,0,0.5);
+  }
 
   /* 覆盖层（开始/暂停/结束） */
   .overlay {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: rgba(26,26,46,0.88); border-radius: 10px;
+    background: radial-gradient(circle at 50% 20%, rgba(43,35,80,0.96), rgba(10,9,24,0.96));
+    border-radius: 16px;
     color: #eee; text-align: center; z-index: 10;
+    animation: fadeUp 0.35s ease;
   }
-  .overlay h1 { font-size: 40px; margin-bottom: 8px; letter-spacing: 4px; }
-  .overlay h2 { font-size: 30px; margin-bottom: 10px; }
-  .overlay p { color: #aaa; font-size: 15px; line-height: 1.8; margin-bottom: 6px; }
-  .overlay .big-score { font-size: 48px; font-weight: bold; color: #4ecca3; margin: 6px 0; }
-  .overlay .new-record { color: #ffd460; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .overlay h1 {
+    font-size: 52px; font-weight: 900; letter-spacing: 8px; margin-bottom: 2px;
+    color: #4ecca3;
+    text-shadow: 0 0 30px rgba(78,204,163,0.4);
+  }
+  @supports (-webkit-background-clip: text) {
+    .overlay h1 {
+      background: linear-gradient(180deg, #b8ffe3, #4ecca3 55%, #1d8a67);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+  .sub-title { font-size: 12px; letter-spacing: 10px; color: #6f7ba0; margin-bottom: 12px; }
+  .overlay h2 { font-size: 32px; font-weight: 900; margin-bottom: 10px; letter-spacing: 4px; }
+  .overlay p { color: #9aa3c0; font-size: 14px; line-height: 1.8; margin-bottom: 6px; }
+  .overlay .big-score {
+    font-size: 58px; font-weight: 900; color: #4ecca3; margin: 4px 0;
+    text-shadow: 0 0 26px rgba(78,204,163,0.55);
+  }
+  .overlay .new-record { color: #ffd460; font-size: 18px; font-weight: bold; margin-bottom: 8px; text-shadow: 0 0 14px rgba(255,212,96,0.5); }
   .btn {
-    margin-top: 18px; padding: 14px 46px; font-size: 20px;
-    border: none; border-radius: 30px;
-    background: linear-gradient(135deg, #4ecca3, #2e9e7d);
-    color: #fff; font-weight: bold;
-    box-shadow: 0 4px 15px rgba(78,204,163,0.4);
+    margin-top: 18px; padding: 15px 52px; font-size: 20px; letter-spacing: 3px;
+    border: none; border-radius: 999px;
+    background: linear-gradient(180deg, #62e0b6, #35b189 60%, #23906d);
+    color: #06251b; font-weight: 900;
+    box-shadow: 0 6px 20px rgba(78,204,163,0.45), inset 0 1px 0 rgba(255,255,255,0.5);
   }
-  .btn:active { transform: scale(0.96); }
+  .btn:active { transform: scale(0.94); }
+  #startBtn { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 6px 20px rgba(78,204,163,0.45), inset 0 1px 0 rgba(255,255,255,0.5); }
+    50% { box-shadow: 0 6px 34px rgba(78,204,163,0.85), inset 0 1px 0 rgba(255,255,255,0.5); }
+  }
   .hidden { display: none !important; }
   .legend { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 14px; font-size: 14px; color: #aaa; max-width: 92%; }
   .legend span { display: flex; align-items: center; gap: 5px; margin: 3px 6px; }
   .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
   .skins { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; max-width: 90%; }
   .skin-chip {
-    padding: 8px 12px; border-radius: 12px; background: #16213e;
-    border: 2px solid #333; color: #ccc; font-size: 13px;
+    padding: 8px 14px; border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.14); color: #b9c2dd; font-size: 13px;
     display: flex; align-items: center; gap: 6px; margin: 3px;
   }
-  .skin-chip.sel { border-color: #4ecca3; color: #fff; }
+  .skin-chip.sel {
+    border-color: #4ecca3; color: #fff;
+    background: rgba(78,204,163,0.16);
+    box-shadow: 0 0 12px rgba(78,204,163,0.35);
+  }
   .skin-chip.locked { opacity: 0.45; }
   .skin-title { margin-top: 16px; font-size: 13px; color: #888; }
 
-  /* 底部方向键 */
-  #dpad { flex: 0 0 auto; padding: 4px 0 12px; }
-  .dp-row { display: flex; justify-content: center; }
-  .dp {
-    width: 76px; height: 56px; margin: 4px;
-    border-radius: 14px; background: #16213e;
-    border: 1px solid #3a4a6b; color: #cfd8ea; font-size: 22px;
+  /* 底部方向键：左右分屏双拇指 */
+  #dpad {
+    flex: 0 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 14px 16px;
   }
-  .dp:active { background: #24365e; }
+  .dp-side { display: flex; gap: 12px; }
+  .dp {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.16); color: #dfe6f7; font-size: 28px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .dp:active {
+    background: rgba(78,204,163,0.25);
+    border-color: rgba(78,204,163,0.7);
+    transform: scale(0.92);
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="topbar">
-    <div class="score-box"><div class="label">得分</div><div class="value" id="score">0</div></div>
-    <div class="score-box"><div class="label">最高分</div><div class="value hs" id="highscore">0</div></div>
+    <div class="score-box"><span>🍎</span><div class="value" id="score">0</div></div>
+    <div class="score-box"><span>👑</span><div class="value hs" id="highscore">0</div></div>
     <button id="pauseBtn">❚❚</button>
   </div>
   <div id="canvasWrap">
@@ -95,6 +147,7 @@
 
     <div class="overlay" id="startScreen">
       <h1>贪吃蛇</h1>
+      <div class="sub-title">S N A K E · R U S H</div>
       <p>滑动或方向键控制，撞墙或咬到自己则失败<br>吃到第2个豆子后出现对手蛇<br>咬它的蛇身可把它变成金豆，被它咬到则失败</p>
       <div class="legend">
         <span><i class="dot" style="background:#e94560"></i>豆子 +1</span>
@@ -106,6 +159,11 @@
       </div>
       <div class="skin-title">皮肤（提升最高分解锁）</div>
       <div class="skins" id="skinRow"></div>
+      <div class="skin-title">道具开关</div>
+      <div class="skins" id="itemRow"></div>
+      <div class="skin-title">对手蛇数量 / 难度</div>
+      <div class="skins" id="npcCountRow"></div>
+      <div class="skins" id="npcDiffRow"></div>
       <button class="btn" id="startBtn">开始游戏</button>
     </div>
 
@@ -125,11 +183,13 @@
     </div>
   </div>
   <div id="dpad">
-    <div class="dp-row"><button class="dp" data-d="up">▲</button></div>
-    <div class="dp-row">
+    <div class="dp-side">
       <button class="dp" data-d="left">◀</button>
-      <button class="dp" data-d="down">▼</button>
       <button class="dp" data-d="right">▶</button>
+    </div>
+    <div class="dp-side">
+      <button class="dp" data-d="up">▲</button>
+      <button class="dp" data-d="down">▼</button>
     </div>
   </div>
 </div>
@@ -159,9 +219,6 @@ window.onerror = function (msg, src, line) {
   var POWER_CHANCE = 0.10;             // 强化道具出现概率
   var POWER_DURATION = 10000;          // 强化道具持续时间(ms)
   var GOLD_DROP_LIFE = 8000;           // 对手蛇掉落金豆存在时间(ms)
-  var ENEMY_LIFE = 18000;              // 对手蛇存在时间(ms)
-  var MAX_ENEMIES = 3;                 // 同屏对手蛇上限
-  var ENEMY_SPAWN_CHANCE = 0.3;        // 吃豆后追加对手蛇的概率
   var EMOJI_FONT = 'px "Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
   var canvas = document.getElementById('game');
@@ -330,7 +387,7 @@ window.onerror = function (msg, src, line) {
 
   // ---------- 游戏状态 ----------
   var snake, dir, nextDir, food, golds, slow, shrink, powerItem, fxThick, fxStar;
-  var enemies = [], foodCount = 0;
+  var enemies = [], foodCount = 0, prevSnake = null;
   var score = 0, interval = BASE_INTERVAL;
   var state = 'start'; // start | playing | paused | over
   var highscore = 0;
@@ -390,10 +447,63 @@ window.onerror = function (msg, src, line) {
     });
   }
 
+  // ---------- 对局设置 ----------
+  var DIFFS = [
+    {name: '简单', spawn: 0.2,  life: 12000, chase: 0},
+    {name: '普通', spawn: 0.3,  life: 18000, chase: 0.35},
+    {name: '困难', spawn: 0.45, life: 25000, chase: 0.7}
+  ];
+  var ITEM_DEFS = [
+    {key: 'slow', label: '减速果'},
+    {key: 'shrink', label: '剪刀果'},
+    {key: 'thick', label: '🍄变粗'},
+    {key: 'star', label: '⭐无敌'}
+  ];
+  var settings = {items: {slow: true, shrink: true, thick: true, star: true}, npcCount: 3, npcDiff: 1};
+  try {
+    var cfg = JSON.parse(localStorage.getItem('snake_cfg') || 'null');
+    if (cfg && cfg.items) settings = cfg;
+  } catch (e) {}
+  function saveCfg() { try { localStorage.setItem('snake_cfg', JSON.stringify(settings)); } catch (e) {} }
+  function chip(row, label, sel, fn) {
+    var d = document.createElement('div');
+    d.className = 'skin-chip' + (sel ? ' sel' : '');
+    d.textContent = label;
+    tap(d, fn);
+    row.appendChild(d);
+  }
+  function renderSettings() {
+    var ir = document.getElementById('itemRow');
+    ir.innerHTML = '';
+    ITEM_DEFS.forEach(function (it) {
+      chip(ir, it.label, settings.items[it.key], function () {
+        settings.items[it.key] = !settings.items[it.key];
+        saveCfg(); renderSettings();
+      });
+    });
+    var nr = document.getElementById('npcCountRow');
+    nr.innerHTML = '';
+    ['无对手', '1条', '2条', '3条'].forEach(function (lb, i) {
+      chip(nr, lb, settings.npcCount === i, function () {
+        settings.npcCount = i;
+        saveCfg(); renderSettings();
+      });
+    });
+    var dr = document.getElementById('npcDiffRow');
+    dr.innerHTML = '';
+    DIFFS.forEach(function (df, i) {
+      chip(dr, df.name, settings.npcDiff === i, function () {
+        settings.npcDiff = i;
+        saveCfg(); renderSettings();
+      });
+    });
+  }
+
   function reset() {
     var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
     snake = [{x: cx, y: cy}, {x: cx - 1, y: cy}, {x: cx - 2, y: cy}];
     dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
+    prevSnake = null;
     score = 0; interval = BASE_INTERVAL;
     golds = []; slow = null; shrink = null; powerItem = null; fxThick = 0; fxStar = 0;
     enemies = []; foodCount = 0; parts = []; flash = 0;
@@ -431,18 +541,30 @@ window.onerror = function (msg, src, line) {
       var g = spawn();
       g.until = Date.now() + GOLD_LIFETIME;
       golds.push(g);
-    } else if (!slow && r < GOLD_CHANCE + SLOW_CHANCE && interval < BASE_INTERVAL - 20) {
+    } else if (settings.items.slow && !slow && r < GOLD_CHANCE + SLOW_CHANCE && interval < BASE_INTERVAL - 20) {
       slow = spawn();
-    } else if (!shrink && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE && snake.length >= 8) {
+    } else if (settings.items.shrink && !shrink && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE && snake.length >= 8) {
       shrink = spawn();
-    } else if (!powerItem && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE + POWER_CHANCE) {
+    } else if ((settings.items.thick || settings.items.star) && !powerItem && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE + POWER_CHANCE) {
       var p = spawn();
-      powerItem = {x: p.x, y: p.y, type: Math.random() < 0.5 ? 'thick' : 'star'};
+      var types = [];
+      if (settings.items.thick) types.push('thick');
+      if (settings.items.star) types.push('star');
+      powerItem = {x: p.x, y: p.y, type: types[Math.floor(Math.random() * types.length)]};
     }
   }
 
+  var lastShownScore = -1;
   function updateScore() {
-    document.getElementById('score').textContent = score;
+    var el = document.getElementById('score');
+    if (score !== lastShownScore) {
+      el.textContent = score;
+      if (score > 0) {
+        el.classList.add('pop');
+        setTimeout(function () { el.classList.remove('pop'); }, 130);
+      }
+      lastShownScore = score;
+    }
     document.getElementById('highscore').textContent = highscore;
   }
 
@@ -462,7 +584,7 @@ window.onerror = function (msg, src, line) {
 
   // ---------- 干扰小蛇 ----------
   function spawnEnemy() {
-    if (enemies.length >= MAX_ENEMIES) return;
+    if (enemies.length >= settings.npcCount) return;
     var dirs = [{x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}];
     for (var t = 0; t < 100; t++) {
       var d = dirs[Math.floor(Math.random() * 4)];
@@ -476,7 +598,7 @@ window.onerror = function (msg, src, line) {
         body.push(c);
       }
       if (!ok) continue;
-      enemies.push({body: body, dir: d, until: Date.now() + ENEMY_LIFE});
+      enemies.push({body: body, dir: d, until: Date.now() + DIFFS[settings.npcDiff].life});
       return;
     }
   }
@@ -490,9 +612,21 @@ window.onerror = function (msg, src, line) {
   }
 
   function moveEnemy(e) {
+    e.prev = e.body.slice();
     var nd = e.dir;
-    if (Math.random() < 0.12 || !enemySafe(e, nd)) {
-      var dirs = [{x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}];
+    var dirs = [{x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}];
+    if (Math.random() < DIFFS[settings.npcDiff].chase) {
+      // 追踪 AI：选择靠近玩家蛇头的安全方向
+      var best = null, bd = 1e9;
+      for (var c = 0; c < 4; c++) {
+        var dc = dirs[c];
+        if (dc.x === -e.dir.x && dc.y === -e.dir.y) continue;
+        if (!enemySafe(e, dc)) continue;
+        var dist = Math.abs(e.body[0].x + dc.x - snake[0].x) + Math.abs(e.body[0].y + dc.y - snake[0].y);
+        if (dist < bd) { bd = dist; best = dc; }
+      }
+      if (best) nd = best;
+    } else if (Math.random() < 0.12 || !enemySafe(e, nd)) {
       var opts = [];
       for (var i = 0; i < 4; i++) {
         var d = dirs[i];
@@ -523,11 +657,12 @@ window.onerror = function (msg, src, line) {
         step();
       }
     }
-    draw();
+    draw(ts);
   }
 
   function step() {
     dir = nextDir;
+    prevSnake = snake.slice();
     var head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
 
     var now = Date.now();
@@ -567,8 +702,10 @@ window.onerror = function (msg, src, line) {
       foodCount++;
       food = spawn();
       maybeSpawnSpecial();
-      if (foodCount === 2) spawnEnemy();
-      else if (foodCount > 2 && Math.random() < ENEMY_SPAWN_CHANCE) spawnEnemy();
+      if (settings.npcCount > 0) {
+        if (foodCount === 2) spawnEnemy();
+        else if (foodCount > 2 && Math.random() < DIFFS[settings.npcDiff].spawn) spawnEnemy();
+      }
     }
     for (var gi2 = golds.length - 1; gi2 >= 0; gi2--) {
       if (inArea(area, golds[gi2])) {
@@ -689,21 +826,41 @@ window.onerror = function (msg, src, line) {
     ctx.globalAlpha = 1;
   }
 
-  function draw() {
+  // 平滑插值：段从上一步位置滑向当前位置
+  function ipos(cur, prev, f) {
+    if (!prev) return cur;
+    var dx = cur.x - prev.x, dy = cur.y - prev.y;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) return cur; // 穿墙瞬移不插值
+    return {x: prev.x + dx * f, y: prev.y + dy * f};
+  }
+
+  function draw(ts) {
     if (!cell) return;
     var now = Date.now();
     var dt = lastDraw ? Math.min(0.05, (now - lastDraw) / 1000) : 0.016;
     lastDraw = now;
+    var frac = 1;
+    if (state === 'playing' && ts && lastStep) frac = Math.max(0, Math.min(1, (ts - lastStep) / interval));
 
     ctx.clearRect(0, 0, boardW, boardH);
 
-    // 棋盘格背景
-    ctx.fillStyle = curSkin().board;
+    // 渐变棋盘背景 + 细网格 + 暗角
+    var bg = ctx.createLinearGradient(0, 0, 0, boardH);
+    bg.addColorStop(0, curSkin().board);
+    bg.addColorStop(1, '#05070f');
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, boardW, boardH);
-    ctx.fillStyle = 'rgba(255,255,255,0.02)';
-    for (var y = 0; y < ROWS; y++)
-      for (var x = 0; x < COLS; x++)
-        if ((x + y) % 2 === 0) ctx.fillRect(x * cell, y * cell, cell, cell);
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var glx = 1; glx < COLS; glx++) { ctx.moveTo(glx * cell, 0); ctx.lineTo(glx * cell, boardH); }
+    for (var gly = 1; gly < ROWS; gly++) { ctx.moveTo(0, gly * cell); ctx.lineTo(boardW, gly * cell); }
+    ctx.stroke();
+    var vg = ctx.createRadialGradient(boardW / 2, boardH / 2, Math.min(boardW, boardH) * 0.45, boardW / 2, boardH / 2, Math.max(boardW, boardH) * 0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, boardW, boardH);
 
     if (!snake) return;
     var pad = Math.max(1, cell * 0.08);
@@ -717,9 +874,16 @@ window.onerror = function (msg, src, line) {
     if (slow) drawFood(slow, '#7f7fff');
     if (shrink) drawFood(shrink, '#ff9f45', true);
     if (powerItem) {
+      var pcx = powerItem.x * cell + cell / 2, pcy = powerItem.y * cell + cell / 2;
+      var pr = cell * (0.7 + Math.sin(now / 200) * 0.1);
+      var pg = ctx.createRadialGradient(pcx, pcy, pr * 0.2, pcx, pcy, pr);
+      pg.addColorStop(0, powerItem.type === 'thick' ? 'rgba(255,120,120,0.5)' : 'rgba(255,220,110,0.55)');
+      pg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, Math.PI * 2); ctx.fill();
       ctx.font = Math.floor(cell * 0.85) + EMOJI_FONT;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(powerItem.type === 'thick' ? '🍄' : '⭐', powerItem.x * cell + cell / 2, powerItem.y * cell + cell / 2 + cell * 0.05);
+      ctx.fillText(powerItem.type === 'thick' ? '🍄' : '⭐', pcx, pcy + cell * 0.05);
     }
 
     // 干扰小蛇
@@ -728,21 +892,23 @@ window.onerror = function (msg, src, line) {
       var fading = en.until - now < 2000 && Math.floor(now / 200) % 2 === 0;
       ctx.globalAlpha = fading ? 0.35 : 1;
       for (var j = en.body.length - 1; j >= 0; j--) {
+        var epos = ipos(en.body[j], en.prev ? en.prev[j] : null, frac);
         ctx.fillStyle = j === 0 ? '#e58296' : '#c05a6e';
-        rr(en.body[j].x * cell + pad, en.body[j].y * cell + pad, cell - pad * 2, cell - pad * 2, cell * 0.25);
+        rr(epos.x * cell + pad, epos.y * cell + pad, cell - pad * 2, cell - pad * 2, cell * 0.25);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
 
-    // 主角蛇（按皮肤风格渲染；变粗时加大）
+    // 主角蛇（按皮肤风格渲染；变粗时加大；平滑插值移动）
     var sk = curSkin();
     var padP = fxThick ? -cell * 0.15 : pad;
     for (var i = snake.length - 1; i >= 0; i--) {
-      drawSeg(snake[i].x, snake[i].y, i === 0, i / snake.length, sk, padP);
+      var spos = ipos(snake[i], prevSnake ? prevSnake[i] : null, frac);
+      drawSeg(spos.x, spos.y, i === 0, i / snake.length, sk, padP);
     }
 
-    var h = snake[0];
+    var h = ipos(snake[0], prevSnake ? prevSnake[0] : null, frac);
     // 变粗：显示 3×3 碰撞框（快结束时闪烁）
     if (fxThick) {
       var bl = fxThick - now < 2000 && Math.floor(now / 200) % 2 === 0;
@@ -866,14 +1032,27 @@ window.onerror = function (msg, src, line) {
   function drawFood(f, color, star) {
     if (!f) return;
     var cx = f.x * cell + cell / 2, cy = f.y * cell + cell / 2;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, cell * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    var pulse = 1 + Math.sin(Date.now() / 220 + f.x * 3 + f.y) * 0.12;
+    var rad = cell * 0.33 * pulse;
+    // 外发光
+    var glow = ctx.createRadialGradient(cx, cy, rad * 0.3, cx, cy, rad * 2.2);
+    glow.addColorStop(0, color);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, rad * 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // 本体：带高光的立体球
+    var g = ctx.createRadialGradient(cx - rad * 0.35, cy - rad * 0.35, rad * 0.1, cx, cy, rad);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(0.3, color);
+    g.addColorStop(1, color);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
     if (star) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.beginPath();
-      ctx.arc(cx - cell * 0.1, cy - cell * 0.1, cell * 0.09, 0, Math.PI * 2);
+      ctx.arc(cx - rad * 0.3, cy - rad * 0.3, rad * 0.25, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -996,6 +1175,7 @@ window.onerror = function (msg, src, line) {
   resize();
   reset();
   renderSkins();
+  renderSettings();
   state = 'start';
   rafId = requestAnimationFrame(loop);
 })();
