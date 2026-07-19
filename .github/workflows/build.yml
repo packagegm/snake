@@ -22,11 +22,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: 还原签名密钥（来自 Secrets）
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > app/snake.jks
+            echo "已还原固定签名密钥"
+          else
+            echo "未配置 KEYSTORE_BASE64，将使用临时 debug 签名（无法覆盖更新）"
+          fi
+
       - name: 构建 APK
-        run: gradle assembleDebug
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease
 
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
           name: snake-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk

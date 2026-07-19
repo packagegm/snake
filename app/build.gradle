@@ -14,9 +14,25 @@ android {
         versionName "1.0"
     }
 
+    signingConfigs {
+        release {
+            if (file('snake.jks').exists()) {
+                storeFile file('snake.jks')
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias 'snake'
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (file('snake.jks').exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
 

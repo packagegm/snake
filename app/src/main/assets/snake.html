@@ -356,6 +356,12 @@ window.onerror = function (msg, src, line) {
   var CHORDS = [164.8, 130.8, 146.8, 164.8];   // E5 C5 D5 E5
   setInterval(function () {
     if (!music.on || !audioCtx || state !== 'playing') return;
+    // 看门狗：WebView 可能悄悄挂起音频上下文，主动唤醒
+    if (audioCtx.state !== 'running') {
+      try { audioCtx.resume(); } catch (e) {}
+      music.next = 0; // 重新对齐节拍
+      return;
+    }
     var stp = Math.max(0.07, interval / 2000); // 16分音符时值，随蛇速加快
     while (music.next < audioCtx.currentTime + 0.3) {
       if (music.next < audioCtx.currentTime) music.next = audioCtx.currentTime;
@@ -1167,6 +1173,7 @@ window.onerror = function (msg, src, line) {
   // 切到后台自动暂停
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && state === 'playing') togglePause();
+    else if (!document.hidden) initAudio(); // 回到前台恢复音频上下文
   });
 
   // ---------- 启动 ----------

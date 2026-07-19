@@ -13,7 +13,7 @@ local.properties
 .vscode/
 .DS_Store
 
-# 签名密钥（如以后添加，不应入库）
+# 签名密钥（不入库，通过 GitHub Secrets 注入）
 *.jks
 *.keystore
 
