@@ -95,13 +95,14 @@
 
     <div class="overlay" id="startScreen">
       <h1>贪吃蛇</h1>
-      <p>滑动屏幕控制方向，撞墙或咬到自己则失败<br>吃到第2个豆子后会出现干扰小蛇，碰到即失败<br>吃到头套后头的碰撞范围变大，小心行动</p>
+      <p>滑动或方向键控制，撞墙或咬到自己则失败<br>吃到第2个豆子后出现对手蛇<br>咬它的蛇身可把它变成金豆，被它咬到则失败</p>
       <div class="legend">
         <span><i class="dot" style="background:#e94560"></i>豆子 +1</span>
         <span><i class="dot" style="background:#ffd460"></i>金豆子 +5</span>
         <span><i class="dot" style="background:#7f7fff"></i>减速果</span>
         <span><i class="dot" style="background:#ff9f45"></i>剪刀果 -3节</span>
-        <span>🐤2×2 🐰3×3 🐶4×4 🐷5×5 头套</span>
+        <span>🍄 变粗10s</span>
+        <span>⭐ 无敌10s·穿墙·碰谁咬谁</span>
       </div>
       <div class="skin-title">皮肤（提升最高分解锁）</div>
       <div class="skins" id="skinRow"></div>
@@ -155,18 +156,12 @@ window.onerror = function (msg, src, line) {
   var SHRINK_CHANCE = 0.08;            // 剪刀果出现概率
   var SHRINK_AMOUNT = 3;               // 剪刀果缩短节数
   var MIN_LEN = 3;                     // 蛇的最短长度
-  var HEAD_CHANCE = 0.10;              // 头套道具出现概率
-  var HEAD_DURATION = 12000;           // 头套持续时间(ms)
-  var ENEMY_LIFE = 18000;              // 干扰蛇存在时间(ms)
-  var MAX_ENEMIES = 3;                 // 同屏干扰蛇上限
-  var ENEMY_SPAWN_CHANCE = 0.3;        // 吃豆后追加干扰蛇的概率
-  // 头套：size = 碰撞区边长（N×N 格）
-  var ANIMALS = [
-    {name: '鸡头', emoji: '🐤', size: 2},
-    {name: '兔子头', emoji: '🐰', size: 3},
-    {name: '狗头', emoji: '🐶', size: 4},
-    {name: '猪头', emoji: '🐷', size: 5}
-  ];
+  var POWER_CHANCE = 0.10;             // 强化道具出现概率
+  var POWER_DURATION = 10000;          // 强化道具持续时间(ms)
+  var GOLD_DROP_LIFE = 8000;           // 对手蛇掉落金豆存在时间(ms)
+  var ENEMY_LIFE = 18000;              // 对手蛇存在时间(ms)
+  var MAX_ENEMIES = 3;                 // 同屏对手蛇上限
+  var ENEMY_SPAWN_CHANCE = 0.3;        // 吃豆后追加对手蛇的概率
   var EMOJI_FONT = 'px "Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
   var canvas = document.getElementById('game');
@@ -225,27 +220,116 @@ window.onerror = function (msg, src, line) {
     turn: function () { beep(440, 0.03, 'square', 0.04); }
   };
 
-  // ---------- 背景音乐（节奏随速度加快） ----------
-  var MELODY = [262, 330, 392, 330, 440, 392, 330, 294];
-  var BASS   = [131, 131, 196, 196, 165, 165, 196, 147];
+  // ---------- 背景音乐：电子摇滚（鼓组+失真贝斯+强力和弦，节奏随速度加快） ----------
   var music = {on: false, next: 0, idx: 0};
   function startMusic() { music.on = true; music.next = 0; music.idx = 0; }
   function stopMusic() { music.on = false; }
+
+  // 白噪声缓冲（军鼓/踩镲用）
+  var noiseBuf = null;
+  function getNoise() {
+    if (!noiseBuf && audioCtx) {
+      noiseBuf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.5), audioCtx.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+  // 失真器（贝斯/和弦过载音色）
+  var shaper = null;
+  function getShaper() {
+    if (!shaper && audioCtx) {
+      shaper = audioCtx.createWaveShaper();
+      var n = 256, c = new Float32Array(n);
+      for (var i = 0; i < n; i++) {
+        var x = i / n * 2 - 1;
+        c[i] = Math.tanh ? Math.tanh(3 * x) : (3 * x) / (1 + Math.abs(3 * x));
+      }
+      shaper.curve = c;
+      shaper.connect(audioCtx.destination);
+    }
+    return shaper;
+  }
+  function playKick(t) {
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.45, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.16);
+    } catch (e) {}
+  }
+  function playHat(t, dur, freq, vol) {
+    try {
+      var src = audioCtx.createBufferSource(); src.buffer = getNoise();
+      var f = audioCtx.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.value = freq; f.Q.value = 1.2;
+      var g = audioCtx.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(f); f.connect(g); g.connect(audioCtx.destination);
+      src.start(t); src.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  function playBass(f, t, d) {
+    try {
+      var o1 = audioCtx.createOscillator(), o2 = audioCtx.createOscillator();
+      o1.type = 'sawtooth'; o2.type = 'sawtooth';
+      o1.frequency.setValueAtTime(f, t);
+      o2.frequency.setValueAtTime(f * 1.007, t);
+      var flt = audioCtx.createBiquadFilter(); flt.type = 'lowpass';
+      flt.frequency.setValueAtTime(900, t);
+      flt.frequency.exponentialRampToValueAtTime(260, t + d);
+      var g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + d);
+      o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(getShaper());
+      o1.start(t); o2.start(t); o1.stop(t + d); o2.stop(t + d);
+    } catch (e) {}
+  }
+  function playChord(f, t, d) {
+    try {
+      var fs = [f * 0.5, f, f * 1.498];
+      for (var i = 0; i < fs.length; i++) {
+        var o = audioCtx.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(fs[i] * (1 + (i - 1) * 0.004), t);
+        var fl = audioCtx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 2200;
+        var g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.045, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + d);
+        o.connect(fl); fl.connect(g); g.connect(getShaper());
+        o.start(t); o.stop(t + d);
+      }
+    } catch (e) {}
+  }
+  // E 小调摇滚 riff（16分音符 × 16步 × 4小节循环）
+  var BASS_RIFF = [82.4, 0, 82.4, 98, 0, 82.4, 110, 98, 82.4, 0, 82.4, 98, 123.5, 110, 98, 73.4];
+  var BAR_SHIFT = [1, 0.794, 0.891, 1];        // E → C → D → E
+  var CHORDS = [164.8, 130.8, 146.8, 164.8];   // E5 C5 D5 E5
   setInterval(function () {
     if (!music.on || !audioCtx || state !== 'playing') return;
-    var beat = Math.max(0.13, interval / 1000);
-    while (music.next < audioCtx.currentTime + 0.25) {
+    var stp = Math.max(0.07, interval / 2000); // 16分音符时值，随蛇速加快
+    while (music.next < audioCtx.currentTime + 0.3) {
       if (music.next < audioCtx.currentTime) music.next = audioCtx.currentTime;
       var t = music.next;
-      playNote(BASS[music.idx % 8], t, beat * 0.9, 'triangle', 0.05);
-      if (music.idx % 2 === 0) playNote(MELODY[(music.idx / 2) % 8], t, beat * 0.55, 'square', 0.025);
-      music.next += beat;
+      var i16 = music.idx % 16;
+      var bar = Math.floor(music.idx / 16) % 4;
+      if (i16 % 4 === 0) playKick(t);                          // 底鼓四踩
+      if (i16 === 4 || i16 === 12) playHat(t, 0.14, 1800, 0.22); // 军鼓
+      playHat(t, i16 % 2 === 0 ? 0.04 : 0.03, 8500, i16 % 2 === 0 ? 0.07 : 0.035); // 踩镲
+      var bf = BASS_RIFF[i16];
+      if (bf) playBass(bf * BAR_SHIFT[bar], t, stp * 1.8);     // 贝斯 riff
+      if (i16 === 0 || i16 === 10) playChord(CHORDS[bar], t, stp * 3); // 强力和弦
+      music.next += stp;
       music.idx++;
     }
-  }, 80);
+  }, 60);
 
   // ---------- 游戏状态 ----------
-  var snake, dir, nextDir, food, gold, slow, shrink, goldTimer, headItem, headFx;
+  var snake, dir, nextDir, food, golds, slow, shrink, powerItem, fxThick, fxStar;
   var enemies = [], foodCount = 0;
   var score = 0, interval = BASE_INTERVAL;
   var state = 'start'; // start | playing | paused | over
@@ -311,7 +395,7 @@ window.onerror = function (msg, src, line) {
     snake = [{x: cx, y: cy}, {x: cx - 1, y: cy}, {x: cx - 2, y: cy}];
     dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
     score = 0; interval = BASE_INTERVAL;
-    gold = null; slow = null; shrink = null; goldTimer = 0; headItem = null; headFx = null;
+    golds = []; slow = null; shrink = null; powerItem = null; fxThick = 0; fxStar = 0;
     enemies = []; foodCount = 0; parts = []; flash = 0;
     food = spawn();
     updateScore();
@@ -324,10 +408,10 @@ window.onerror = function (msg, src, line) {
       for (j = 0; j < enemies[i].body.length; j++)
         if (enemies[i].body[j].x === x && enemies[i].body[j].y === y) return true;
     if (food && food.x === x && food.y === y) return true;
-    if (gold && gold.x === x && gold.y === y) return true;
+    for (i = 0; i < golds.length; i++) if (golds[i].x === x && golds[i].y === y) return true;
     if (slow && slow.x === x && slow.y === y) return true;
     if (shrink && shrink.x === x && shrink.y === y) return true;
-    if (headItem && headItem.x === x && headItem.y === y) return true;
+    if (powerItem && powerItem.x === x && powerItem.y === y) return true;
     return false;
   }
 
@@ -343,18 +427,17 @@ window.onerror = function (msg, src, line) {
 
   function maybeSpawnSpecial() {
     var r = Math.random();
-    if (!gold && r < GOLD_CHANCE) {
-      gold = spawn(); goldTimer = Date.now() + GOLD_LIFETIME;
+    if (golds.length === 0 && r < GOLD_CHANCE) {
+      var g = spawn();
+      g.until = Date.now() + GOLD_LIFETIME;
+      golds.push(g);
     } else if (!slow && r < GOLD_CHANCE + SLOW_CHANCE && interval < BASE_INTERVAL - 20) {
       slow = spawn();
     } else if (!shrink && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE && snake.length >= 8) {
       shrink = spawn();
-    } else if (!headItem && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE + HEAD_CHANCE) {
-      var an = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-      var p, t2 = 0;
-      do { p = spawn(); t2++; }
-      while ((p.x < 2 || p.x >= COLS - 2 || p.y < 2 || p.y >= ROWS - 2) && t2 < 50);
-      headItem = {x: p.x, y: p.y, animal: an};
+    } else if (!powerItem && r < GOLD_CHANCE + SLOW_CHANCE + SHRINK_CHANCE + POWER_CHANCE) {
+      var p = spawn();
+      powerItem = {x: p.x, y: p.y, type: Math.random() < 0.5 ? 'thick' : 'star'};
     }
   }
 
@@ -393,7 +476,7 @@ window.onerror = function (msg, src, line) {
         body.push(c);
       }
       if (!ok) continue;
-      enemies.push({body: body, dir: d, headFx: null, until: Date.now() + ENEMY_LIFE});
+      enemies.push({body: body, dir: d, until: Date.now() + ENEMY_LIFE});
       return;
     }
   }
@@ -407,7 +490,6 @@ window.onerror = function (msg, src, line) {
   }
 
   function moveEnemy(e) {
-    if (e.headFx && Date.now() > e.headFx.until) e.headFx = null;
     var nd = e.dir;
     if (Math.random() < 0.12 || !enemySafe(e, nd)) {
       var dirs = [{x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}];
@@ -423,16 +505,11 @@ window.onerror = function (msg, src, line) {
     e.dir = nd;
     e.body.unshift({x: e.body[0].x + nd.x, y: e.body[0].y + nd.y});
     e.body.pop();
-    // 干扰蛇抢道具（不吃豆子）
-    var es = e.headFx ? e.headFx.animal.size : 1;
-    var ea = headArea(e.body[0], es);
-    if (slow && inArea(ea, slow)) slow = null;
-    if (shrink && inArea(ea, shrink)) shrink = null;
-    if (headItem && inArea(ea, headItem)) {
-      e.headFx = {animal: headItem.animal, until: Date.now() + HEAD_DURATION};
-      headItem = null;
-      sfx.head();
-    }
+    // 对手蛇抢道具（不吃豆子）
+    var hd = e.body[0];
+    if (slow && slow.x === hd.x && slow.y === hd.y) slow = null;
+    if (shrink && shrink.x === hd.x && shrink.y === hd.y) shrink = null;
+    if (powerItem && powerItem.x === hd.x && powerItem.y === hd.y) powerItem = null;
   }
 
   // ---------- 主循环 ----------
@@ -453,21 +530,30 @@ window.onerror = function (msg, src, line) {
     dir = nextDir;
     var head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
 
-    // 头套到期恢复
-    if (headFx && Date.now() > headFx.until) { headFx = null; sfx.headOff(); }
-    var ps = headFx ? headFx.animal.size : 1;
+    var now = Date.now();
+    // 强化效果到期恢复
+    if (fxThick && now > fxThick) { fxThick = 0; sfx.headOff(); }
+    if (fxStar && now > fxStar) { fxStar = 0; sfx.headOff(); }
+    // 无敌：穿墙
+    if (fxStar) {
+      head.x = (head.x + COLS) % COLS;
+      head.y = (head.y + ROWS) % ROWS;
+    }
+    var ps = fxThick ? 3 : 1;
     var area = headArea(head, ps);
 
-    // 撞墙：头部碰撞区任何一格出界即死
-    for (var w = 0; w < area.length; w++) {
-      var c = area[w];
-      if (c.x < 0 || c.x >= COLS || c.y < 0 || c.y >= ROWS) return gameOver();
-    }
-    // 撞自己：大头时跳过颈部附近节段，避免误判
-    var skip = ps === 1 ? 0 : ps * 2;
-    for (var i = 0; i < snake.length - 1; i++) {
-      if (i < skip) continue;
-      if (inArea(area, snake[i])) return gameOver();
+    if (!fxStar) {
+      // 撞墙：碰撞区任何一格出界即死（变粗时为3×3）
+      for (var w = 0; w < area.length; w++) {
+        var c = area[w];
+        if (c.x < 0 || c.x >= COLS || c.y < 0 || c.y >= ROWS) return gameOver();
+      }
+      // 撞自己：变粗时跳过颈部附近节段，避免误判
+      var skip = ps === 1 ? 0 : 6;
+      for (var i = 0; i < snake.length - 1; i++) {
+        if (i < skip) continue;
+        if (inArea(area, snake[i])) return gameOver();
+      }
     }
 
     snake.unshift(head);
@@ -484,10 +570,14 @@ window.onerror = function (msg, src, line) {
       if (foodCount === 2) spawnEnemy();
       else if (foodCount > 2 && Math.random() < ENEMY_SPAWN_CHANCE) spawnEnemy();
     }
-    if (gold && inArea(area, gold)) {
-      score += 5; grew = true; sfx.gold();
-      goldBlast(gold);
-      gold = null;
+    for (var gi2 = golds.length - 1; gi2 >= 0; gi2--) {
+      if (inArea(area, golds[gi2])) {
+        score += 5; grew = true; sfx.gold();
+        goldBlast(golds[gi2]);
+        golds.splice(gi2, 1);
+      } else if (now > golds[gi2].until) {
+        golds.splice(gi2, 1);
+      }
     }
     if (slow && inArea(area, slow)) {
       grew = true; sfx.slow();
@@ -500,36 +590,52 @@ window.onerror = function (msg, src, line) {
       if (cut > 0) snake.splice(snake.length - cut, cut);
       shrink = null;
     }
-    if (headItem && inArea(area, headItem)) {
+    if (powerItem && inArea(area, powerItem)) {
       grew = true; sfx.head();
-      headFx = {animal: headItem.animal, until: Date.now() + HEAD_DURATION};
-      headItem = null;
+      if (powerItem.type === 'thick') fxThick = now + POWER_DURATION;
+      else fxStar = now + POWER_DURATION;
+      powerItem = null;
     }
 
     if (!grew) snake.pop();
 
-    // 金豆子限时消失
-    if (gold && Date.now() > goldTimer) gold = null;
-
-    // 干扰蛇：到期消失 + 移动
+    // 对手蛇：到期消失 + 移动
     for (var e2 = enemies.length - 1; e2 >= 0; e2--) {
-      if (Date.now() > enemies[e2].until) { enemies.splice(e2, 1); continue; }
+      if (now > enemies[e2].until) { enemies.splice(e2, 1); continue; }
       moveEnemy(enemies[e2]);
     }
 
-    // 玩家头部碰撞区 碰到干扰蛇（含其变大的头） → 失败
-    var ps2 = headFx ? headFx.animal.size : 1;
+    // 与对手蛇的攻防判定
+    var ps2 = fxThick ? 3 : 1;
     var area2 = headArea(snake[0], ps2);
-    for (var e3 = 0; e3 < enemies.length; e3++) {
+    for (var e3 = enemies.length - 1; e3 >= 0; e3--) {
       var en = enemies[e3];
-      var ec = en.body.slice();
-      var es = en.headFx ? en.headFx.animal.size : 1;
-      if (es > 1) ec = ec.concat(headArea(en.body[0], es));
-      for (var q = 0; q < ec.length; q++)
-        if (inArea(area2, ec[q])) return gameOver();
+      if (fxStar) {
+        // 无敌：碰到对手任何部位直接咬死它
+        for (var q0 = 0; q0 < en.body.length; q0++)
+          if (inArea(area2, en.body[q0])) { killEnemy(e3); break; }
+        continue;
+      }
+      // 头对头相撞 → 失败
+      if (inArea(area2, en.body[0])) return gameOver();
+      // 对手咬到我的身体 → 失败
+      for (var q1 = 1; q1 < snake.length; q1++)
+        if (en.body[0].x === snake[q1].x && en.body[0].y === snake[q1].y) return gameOver();
+      // 我咬到对手的蛇身 → 对手变成金豆
+      for (var q2 = 1; q2 < en.body.length; q2++)
+        if (inArea(area2, en.body[q2])) { killEnemy(e3); break; }
     }
 
     updateScore();
+  }
+
+  function killEnemy(idx) {
+    var en = enemies[idx];
+    for (var i = 0; i < en.body.length; i++)
+      golds.push({x: en.body[i].x, y: en.body[i].y, until: Date.now() + GOLD_DROP_LIFE});
+    confettiAt(en.body[0]);
+    sfx.gold();
+    enemies.splice(idx, 1);
   }
 
   function gameOver() {
@@ -604,16 +710,16 @@ window.onerror = function (msg, src, line) {
 
     // 豆子与道具
     drawFood(food, '#e94560');
-    if (gold) {
-      var blink = now > goldTimer - 2000 && Math.floor(now / 200) % 2 === 0;
-      if (!blink) drawFood(gold, '#ffd460', true);
+    for (var gi = 0; gi < golds.length; gi++) {
+      var blink = golds[gi].until - now < 2000 && Math.floor(now / 200) % 2 === 0;
+      if (!blink) drawFood(golds[gi], '#ffd460', true);
     }
     if (slow) drawFood(slow, '#7f7fff');
     if (shrink) drawFood(shrink, '#ff9f45', true);
-    if (headItem) {
+    if (powerItem) {
       ctx.font = Math.floor(cell * 0.85) + EMOJI_FONT;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(headItem.animal.emoji, headItem.x * cell + cell / 2, headItem.y * cell + cell / 2 + cell * 0.05);
+      ctx.fillText(powerItem.type === 'thick' ? '🍄' : '⭐', powerItem.x * cell + cell / 2, powerItem.y * cell + cell / 2 + cell * 0.05);
     }
 
     // 干扰小蛇
@@ -627,30 +733,46 @@ window.onerror = function (msg, src, line) {
         ctx.fill();
       }
       ctx.globalAlpha = 1;
-      if (en.headFx) drawEmojiHead(en.body[0], en.headFx.animal.size, en.headFx.animal.emoji, fading ? 0.35 : 1);
     }
 
-    // 主角蛇（按皮肤风格渲染）
+    // 主角蛇（按皮肤风格渲染；变粗时加大）
     var sk = curSkin();
+    var padP = fxThick ? -cell * 0.15 : pad;
     for (var i = snake.length - 1; i >= 0; i--) {
-      drawSeg(snake[i].x, snake[i].y, i === 0, i / snake.length, sk, pad);
+      drawSeg(snake[i].x, snake[i].y, i === 0, i / snake.length, sk, padP);
     }
 
-    // 蛇头：头套或默认眼睛
     var h = snake[0];
-    if (headFx) {
-      var rem = headFx.until - now;
-      var a = (rem < 2000 && Math.floor(now / 200) % 2 === 0) ? 0.4 : 1;
-      drawEmojiHead(h, headFx.animal.size, headFx.animal.emoji, a);
-    } else {
-      ctx.fillStyle = '#1a1a2e';
-      var ex = h.x * cell + cell / 2, ey = h.y * cell + cell / 2;
-      var off = cell * 0.18, r = Math.max(1.5, cell * 0.07);
-      var px = dir.y !== 0 ? off : 0, py = dir.x !== 0 ? off : 0;
-      var fx = dir.x * cell * 0.12, fy = dir.y * cell * 0.12;
-      ctx.beginPath(); ctx.arc(ex - px + fx, ey - py + fy, r, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(ex + px + fx, ey + py + fy, r, 0, Math.PI * 2); ctx.fill();
+    // 变粗：显示 3×3 碰撞框（快结束时闪烁）
+    if (fxThick) {
+      var bl = fxThick - now < 2000 && Math.floor(now / 200) % 2 === 0;
+      if (!bl) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect((h.x - 1) * cell, (h.y - 1) * cell, cell * 3, cell * 3);
+      }
     }
+    // 无敌：金色光环 + 火花
+    if (fxStar) {
+      var bl2 = fxStar - now < 2000 && Math.floor(now / 200) % 2 === 0;
+      if (!bl2) {
+        ctx.strokeStyle = 'rgba(255,212,96,0.8)';
+        ctx.lineWidth = Math.max(2, cell * 0.12);
+        ctx.beginPath();
+        ctx.arc(h.x * cell + cell / 2, h.y * cell + cell / 2, cell * 0.95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (Math.random() < 0.4)
+        parts.push({x: h.x * cell + cell / 2, y: h.y * cell + cell / 2, vx: (Math.random() - 0.5) * cell * 3, vy: (Math.random() - 0.5) * cell * 3, life: 0.6, dec: 1.5, c: '#ffd460', s: 2 + Math.random() * 2});
+    }
+    // 蛇眼睛
+    ctx.fillStyle = '#1a1a2e';
+    var ex = h.x * cell + cell / 2, ey = h.y * cell + cell / 2;
+    var off = cell * 0.18, r = Math.max(1.5, cell * 0.07);
+    var px = dir.y !== 0 ? off : 0, py = dir.x !== 0 ? off : 0;
+    var fx = dir.x * cell * 0.12, fy = dir.y * cell * 0.12;
+    ctx.beginPath(); ctx.arc(ex - px + fx, ey - py + fy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex + px + fx, ey + py + fy, r, 0, Math.PI * 2); ctx.fill();
 
     // 粒子特效
     for (var p = parts.length - 1; p >= 0; p--) {
