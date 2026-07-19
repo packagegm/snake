@@ -40,7 +40,7 @@
 
   /* 覆盖层（开始/暂停/结束） */
   .overlay {
-    position: absolute; inset: 0;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: rgba(26,26,46,0.88); border-radius: 10px;
     color: #eee; text-align: center; z-index: 10;
@@ -60,13 +60,13 @@
   .btn:active { transform: scale(0.96); }
   .hidden { display: none !important; }
   .legend { display: flex; gap: 18px; margin-top: 14px; font-size: 14px; color: #aaa; }
-  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend span { display: flex; align-items: center; gap: 5px; margin: 3px 6px; }
   .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
   .skins { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; max-width: 90%; }
   .skin-chip {
     padding: 8px 12px; border-radius: 12px; background: #16213e;
     border: 2px solid #333; color: #ccc; font-size: 13px;
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px; margin: 3px;
   }
   .skin-chip.sel { border-color: #4ecca3; color: #fff; }
   .skin-chip.locked { opacity: 0.45; }
@@ -116,6 +116,12 @@
 </div>
 
 <script>
+window.onerror = function (msg, src, line) {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#a00;color:#fff;font-size:12px;padding:6px;z-index:999;word-break:break-all;';
+  d.textContent = '脚本错误: ' + msg + ' (行 ' + line + ')';
+  document.body.appendChild(d);
+};
 (function () {
   'use strict';
 
@@ -223,7 +229,7 @@
       var d = document.createElement('div');
       d.className = 'skin-chip' + (i === skinIdx ? ' sel' : '') + (un ? '' : ' locked');
       d.innerHTML = '<i class="dot" style="background:' + sk.head + '"></i>' + sk.name + (un ? '' : ' 🔒' + sk.need + '分');
-      d.addEventListener('click', function () {
+      tap(d, function () {
         if (!un) return;
         skinIdx = i;
         try { localStorage.setItem('snake_skin', String(i)); } catch (e) {}
@@ -533,15 +539,27 @@
     }
   }
 
-  document.getElementById('startBtn').addEventListener('click', startGame);
-  document.getElementById('menuBtn').addEventListener('click', function () {
+  // 同时监听 touchend 和 click，兼容老版 WebView 点击失灵
+  function tap(el, fn) {
+    var fired = 0;
+    el.addEventListener('touchend', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      fired = Date.now(); fn();
+    });
+    el.addEventListener('click', function () {
+      if (Date.now() - fired > 500) fn();
+    });
+  }
+
+  tap(document.getElementById('startBtn'), startGame);
+  tap(document.getElementById('menuBtn'), function () {
     show('overScreen', false);
     show('startScreen', true);
     state = 'start';
   });
-  document.getElementById('restartBtn').addEventListener('click', startGame);
-  document.getElementById('resumeBtn').addEventListener('click', togglePause);
-  document.getElementById('pauseBtn').addEventListener('click', function () {
+  tap(document.getElementById('restartBtn'), startGame);
+  tap(document.getElementById('resumeBtn'), togglePause);
+  tap(document.getElementById('pauseBtn'), function () {
     initAudio();
     togglePause();
   });
